@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -41,13 +43,7 @@ type FeaturedResponse struct {
 }
 
 func getGameList() (list []GameInfo, err error) {
-	client := &http.Client{}
-	var requestBuilder strings.Builder
-	requestBuilder.WriteString(baseURI)
-	requestBuilder.WriteString("game?true")
-	req, _ := http.NewRequest("GET", requestBuilder.String(), nil)
-
-	resp, err := client.Do(req)
+	resp, err := http.Get(baseURI + "game")
 
 	if err != nil {
 		// do error handling
@@ -151,7 +147,54 @@ func SearchForWoWAddon(searchterm string, gameVersion string) ([]AddonInfo, erro
 }
 
 // DownloadAddon tries to download the addon files for the given AddonInfo
-func DownloadAddon(addonInfo AddonInfo) error {
+func DownloadAddon(addonInfo AddonInfo, targetVersion string, targetFolder string) error {
+	targetFile := getTargetFileInfo(addonInfo.Files, targetVersion)
 
+	if targetFile == nil {
+		return errors.New("No matching version found")
+	}
+
+	resp, err := http.Get(targetFile.URL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var dir string
+	if len(targetFolder) > 0 {
+		dir = targetFolder
+	} else {
+		dir = "tmp"
+	}
+	err = os.Mkdir(dir, 0755)
+	if err != nil {
+		return err
+	}
+	localPath := dir + "/" + targetFile.Name
+	out, err := os.Create(localPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	return err
+}
+
+func getTargetFileInfo(files []AddonFile, targetVersion string) *AddonFile {
+	for _, fileInfo := range files {
+		if contains(fileInfo.GameVersions, targetVersion) {
+			return &fileInfo
+		}
+	}
 	return nil
+}
+
+func contains(s []string, str string) bool {
+	for _, val := range s {
+		if val == str {
+			return true
+		}
+	}
+	return false
 }
