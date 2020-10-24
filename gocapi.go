@@ -147,7 +147,7 @@ func SearchForWoWAddon(searchterm string, gameVersion string) ([]AddonInfo, erro
 }
 
 // DownloadAddon tries to download the addon files for the given AddonInfo
-func DownloadAddon(addonInfo AddonInfo, targetVersion string) error {
+func DownloadAddon(addonInfo AddonInfo, targetVersion string, targetFolder string) error {
 	targetFile := getTargetFileInfo(addonInfo.Files, targetVersion)
 
 	if targetFile == nil {
@@ -160,7 +160,17 @@ func DownloadAddon(addonInfo AddonInfo, targetVersion string) error {
 	}
 	defer resp.Body.Close()
 
-	localPath := "tmp/" + targetFile.Name
+	var dir string
+	if len(targetFolder) > 0 {
+		dir = targetFolder
+	} else {
+		dir = "tmp"
+	}
+	err = os.Mkdir(dir, 0755)
+	if err != nil {
+		return err
+	}
+	localPath := dir + "/" + targetFile.Name
 	out, err := os.Create(localPath)
 	if err != nil {
 		return err
